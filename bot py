@@ -1,0 +1,66 @@
+import asyncio, websockets, json, requests, time
+
+TELEGRAM_TOKEN = "PASTE_HAPA_TOKEN_YA_@kathama_price_bot"
+DERIV_TOKEN = "PASTE_HAPA_TOKEN_YA_DERIV"
+CHANNEL_ID = "@kathamaprincetraderke"
+BLOG_LINK = "https://kathamapricetraderke.blogspot.com/2026/10/7-even-7-even-50-odd-50-buy-even-65.html"
+
+def send_telegram(chat_id, text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    try:
+        requests.post(url, data={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}, timeout=10)
+    except: pass
+
+def send_channel(text):
+    send_telegram(CHANNEL_ID, text)
+
+async def trade_even(chat_id, stake, sl, tp):
+    uri = "wss://ws.binaryws.com/websockets/v3?app_id=1089"
+    profit = 0
+    try:
+        async with websockets.connect(uri) as ws:
+            await ws.send(json.dumps({"authorize": DERIV_TOKEN}))
+            await ws.recv()
+            send_telegram(chat_id, f"🔥 *KATHAMA PRINCE BOT STARTED*\n📊 7 EVEN 65%\n💰 Stake:{stake} SL:{sl} TP:{tp}\n🌐 {BLOG_LINK}")
+            while True:
+                await ws.send(json.dumps({"buy":1,"parameters":{"amount":stake,"basis":"stake","contract_type":"DIGITEVEN","currency":"USD","duration":1,"duration_unit":"t","symbol":"R_100"}}))
+                await ws.recv()
+                profit += 1
+                if profit >= tp:
+                    msg = f"🔥 *KATHAMA PRINCE TP REACHED {profit} USD* 🔥\n✅ 7 EVEN 65%\n🌐 {BLOG_LINK}\n📢 {CHANNEL_ID}"
+                    send_telegram(chat_id, msg)
+                    send_channel(msg)
+                    break
+                if profit <= -sl:
+                    send_telegram(chat_id, f"❌ SL HIT {profit}\n🌐 {BLOG_LINK}")
+                    break
+                await asyncio.sleep(2)
+    except Exception as e:
+        print(e)
+
+def start_bot():
+    offset = 0
+    print("BOT LIVE")
+    send_channel(f"✅ *BOT ONLINE - 7 EVEN!*\n📥 {BLOG_LINK}\n🔔 TP Alert: KATHAMA PRINCE TP REACHED")
+    while True:
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates?offset={offset}&timeout=30"
+            res = requests.get(url, timeout=35).json()
+            for u in res.get("result", []):
+                offset = u["update_id"]+1
+                msg = u.get("message", {})
+                chat_id = msg.get("chat", {}).get("id")
+                text = msg.get("text", "")
+                if not chat_id: continue
+                if text=="/start":
+                    send_telegram(chat_id, f"🔥 *KATHAMA PRINCE*\n📊 7 EVEN 65%\n📥 {BLOG_LINK}\n\nCommands:\n/trade_small - Stake 2\n/trade_big - Stake 50")
+                elif text=="/trade_small":
+                    asyncio.run(trade_even(chat_id, 2, 3, 5))
+                elif text=="/trade_big":
+                    asyncio.run(trade_even(chat_id, 50, 50, 120))
+        except Exception as e:
+            print(e)
+            time.sleep(5)
+
+if __name__=="__main__":
+    start_bot()
